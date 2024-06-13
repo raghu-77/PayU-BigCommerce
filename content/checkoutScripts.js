@@ -1,5 +1,5 @@
 const context = require("../context");
-const firebase = require("../dbs/firebase")
+const firebase = require("../lib/dbs/firebase")
 
 
 async function getChannels(hash, token) {
@@ -26,44 +26,54 @@ async function getChannels(hash, token) {
 }
 
 async function createScript(firebaseData) {
-  const {accessToken, storeHash} = firebaseData;
+  const { accessToken, storeHash } = firebaseData;
 
   console.log("======= context data =======");
   console.log(context.data);
 
-  let url = `https://api.bigcommerce.com/stores/${storeHash}/v3/content/scripts`;
+  const url = `https://api.bigcommerce.com/stores/${storeHash}/v3/content/scripts`;
 
-  const channels = await getChannels(hash, token);
-  console.log(channels, "Channels");
+  try {
+    const channels = await getChannels(storeHash, accessToken);
+    console.log(channels, "Channels");
 
-  let scriptUuid = [];
+    let scriptUuid = [];
 
-  channels?.forEach(ele => {
-    const channelId = ele.id;
+    for (const ele of channels) {
+      const channelId = ele.id;
 
-    let options = {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "X-Auth-Token": accessToken,
-      },
-      body: `{"name":"PayU Script","description":"Handle Payment using PayU","html": "<script src=\'https://cdn.shopify.com/s/files/1/0604/7648/9904/files/bigcommerce_razorpay_checkout_button.js?v=1717057420'></script>","src":"","auto_uninstall":true,"load_method":"default","location":"footer","visibility":"checkout","kind":"script_tag","channel_id":${channelId},"consent_category":"essential"}`,
-    };
-  
-    fetch(url, options)
-      .then((res) => res.json())
-      .then((json) => {
+      const options = {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Auth-Token": accessToken,
+        },
+        body: `{"name":"PayU Script","description":"Handle Payment using PayU","html":"<script src='https://cdn.shopify.com/s/files/1/0604/7648/9904/files/bigcommerce_razorpay_checkout_button.js?v=1717057420'></script>","src":"","auto_uninstall":true,"load_method":"default","location":"footer","visibility":"checkout","kind":"script_tag","channel_id":${channelId},"consent_category":"essential"}`,
+      };
+
+      try {
+        const response = await fetch(url, options);
+        const json = await response.json();
+
         context.set("uuid", json.data.uuid);
         console.log(json, "uuid");
+
         // firebaseData.uuid = json.data.uuid;
         // firebase.setStore(firebaseData);
         let channelUuid = { name: "Alice", uuid: json.data.uuid };
-      })
-      .catch((err) => console.error("error:" + err));
-  });
+        scriptUuid.push(channelUuid);
+      } catch (err) {
+        console.error("error:", err);
+      }
+    }
 
+    return scriptUuid;
+  } catch (err) {
+    console.error("Error fetching channels:", err);
+  }
 }
+
 
 function deleteScript() {
   const hash = context.get("store_hash");
@@ -94,52 +104,53 @@ function deleteScript() {
 }
 
 async function checkScripts(storeHash) {
-  firebase.getStore(storeHash);
-  const hash = context.get("store_hash");
-  const token = context.get("token");
-  const channelId = context.get("channel_id");
+  try {
+    await firebase.getStore(storeHash); // Assuming this function returns a promise
 
-  // console.log("======= context data checkscript =======");
-  // console.log(context.data);
+    const hash = context.get("store_hash");
+    const token = context.get("token");
+    const channelId = context.get("channel_id");
 
-  const channels = await getChannels(hash, token);
-  console.log(channels, "Channels");
+    // console.log("======= context data checkscript =======");
+    // console.log(context.data);
 
+    const channels = await getChannels(hash, token);
+    console.log(channels, "Channels");
 
-  if (context.data) {
-    let url = `https://api.bigcommerce.com/stores/${hash}/v3/content/scripts?channel_id:in=${channelId}`;
+    if (context.data) {
+      let url = `https://api.bigcommerce.com/stores/${hash}/v3/content/scripts?channel_id:in=${channelId}`;
 
-    let options = {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "X-Auth-Token": token,
-      },
-    };
+      let options = {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Auth-Token": token,
+        },
+      };
 
-    fetch(url, options)
-      .then((res) => res.json())
-      .then((json) => {
-        let data = json.data;
+      const response = await fetch(url, options);
+      const json = await response.json();
+      let data = json.data;
 
-        if (data?.length) {
-          const uuid = context.get("uuid");
+      if (data?.length) {
+        const uuid = context.get("uuid");
+        const uuidExists = data.some((item) => item.uuid === uuid);
 
-          const uuidExists = data.some((item) => item.uuid === uuid);
-
-          //check if app installed script exists.
-          if (!uuidExists) {
-            createScript();
-          } else {
-            console.log("Script exists..");
-          }
+        // Check if app installed script exists.
+        if (!uuidExists) {
+          await createScript(); 
         } else {
-          createScript();
+          console.log("Script exists..");
         }
-      })
-      .catch((err) => console.error("error:" + err));
+      } else {
+        await createScript(); // Assuming this function returns a promise
+      }
+    }
+  } catch (err) {
+    console.error("error:" + err);
   }
 }
+
 
 module.exports = { createScript, deleteScript, checkScripts };

@@ -5,12 +5,15 @@ const express = require("express"),
 const context = require("../context");
 const checkScripts = require("../content/checkoutScripts");
 
+// Prod applications might use config file
+const { CLIENT_ID, SECRET, CALLBACK } = process.env;
+
 require("dotenv").config();
 
 const bigCommerce = new BigCommerce({
-  clientId: process.env.CLIENT_ID,
-  secret: process.env.SECRET,
-  callback: process.env.CALLBACK,
+  clientId: CLIENT_ID,
+  secret: SECRET,
+  callback: CALLBACK,
   responseType: "json",
 });
 

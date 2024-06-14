@@ -6,8 +6,6 @@ export default async function load(req: NextApiRequest, res: NextApiResponse) {
         // Verify when app loaded (launch)
         const session = await getBCVerify(req.query);
         const encodedContext = encodePayload(session); // Signed JWT to validate/ prevent tampering
-        // const { accessToken, storeHash } = await getSession(req);
-        // console.log("Session", accessToken);
         
  
         await setSession(session);

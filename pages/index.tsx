@@ -1,114 +1,131 @@
-import { Panel, Box, Button, Tooltip, Text, Flex, FlexItem} from '@bigcommerce/big-design';
+import { Panel, Box, Button, Tooltip, Text, Flex, FlexItem } from '@bigcommerce/big-design';
 import React, { useEffect, useState } from 'react';
 import ErrorMessage from '../components/error';
+import Loading from '../components/loading';
 import { alertsManager } from './_app';
+import { useQuery } from '../context/session';
 
-const handleButtonClick = async (item, setLoadingStates, loadingStates, e) => {
 
-  console.log(item, e);
-
+const handleButtonClick = async (item, setLoadingStates, loadingStates, setChannel, inject) => {
   setLoadingStates({ ...loadingStates, [item._id]: true });
 
-  //show alert popup when script injected and ejected from channels 
-  const alertId = alertsManager.add({
-    messages: [{ text: item.uuid ? `Script is ejected from ${item.name}` : `Script is injected to ${item.name}` }],
-    type: 'error',
-    onClose: () => null
-  });
+  //initial alert popup with null value
+  let alertId = null;
+  let url = ''; //API Url
+  const authToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1dWlkIjoiMWFmMDVkNGMtMjdjNS00ZjYwLWE5YzEtNDdjZGE0MmZjZjE0IiwiaWF0IjoxNzE4NzczODkwLCJleHAiOjE3MTg4NjAyOTB9.AinncUlUKI4aMhirBjRd5f650PRziHZvVDyTcztFhms';
+  let requestOptions; //Authentication token
+  const channelId = item.channelId //Chanel Id
+  console.log(item.channelId);
 
-  // Remove the alert after 2 seconds
-  setTimeout(() => {
+
+  try {
+    //Inject Script
+    if (inject) {
+      url = 'https://payu.in.ngrok.io/api/channel/inject';
+
+      requestOptions = {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': authToken
+        },
+        body: JSON.stringify({ channel_id: channelId }),
+      };
+    } else {
+      //Eject Script
+      url = 'https://payu.in.ngrok.io/api/channel/eject';
+
+      requestOptions = {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': authToken
+        },
+        body: JSON.stringify({ channel_id: channelId }),
+      };
+    }
+
+    console.log(url, requestOptions);
+
+    const response = await fetch(url, requestOptions);
+
+    if (!response.ok) {
+      throw new Error('Network response was not ok: ' + response.statusText);
+    }
+
+    const result = await response.json();
+    setChannel(result.data);
+    console.log(result.data, 'data');
+
+    // Update the alert type to success on successful response
+    alertId = alertsManager.add({
+      messages: [{ text: item.injectedAt != null ? `Script is ejecting from ${item.channelName}` : `Script is injecting to ${item.channelName}` }],
+      type: 'success', // Initially set to loading
+      onClose: () => null,
+    });
+
+  } catch (error) {
+    console.error('There has been a problem with your fetch operation:', error);
+
+    // Update the alert type to error on failure
+    alertId = alertsManager.add({
+      messages: [{ text: 'There was a problem with your request.' }],
+      type: 'error',
+      onClose: () => null,
+    });
+
+    //remove alert manager after 2 seconds
+    setTimeout(() => {
+      alertsManager.remove(alertId);
+    }, 2000);
+
+  } finally {
+    //remove button loading
     setLoadingStates({ ...loadingStates, [item._id]: false });
-    alertsManager.remove(alertId);
-  }, 2000);
 
+    //remove alert manager after 2 seconds
+    setTimeout(() => {
+      alertsManager.remove(alertId);
+    }, 2000);
+  }
 };
+
 
 export default function Index() {
   const [Channel, setChannel] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [loadingStates, setLoadingStates] = useState({});
+  const [Token, setToken] = useState(null);
+  const searchParams = useQuery();
 
-  const data = [
-    {
-      "_id": "66689410213783aab5d0fed9",
-      "channelId": 1,
-      "name": "Marmeto IN",
-      "__v": 0,
-      "createdAt": "2024-06-11T18:14:40.494Z",
-      "domain": "https://marmetotest1.mybigcommerce.com",
-      "ejectedAt": null,
-      "injectedAt": null,
-      "isEnabled": true,
-      "updatedAt": "2024-06-11T18:14:40.494Z",
-      "uuid": "1af05d4c-27c5-4f60-a9c1-47cda42fcf14"
-    },
-    {
-      "_id": "66689410213783aab5d0ff13",
-      "channelId": 1588903,
-      "name": "Marmeto US",
-      "__v": 0,
-      "createdAt": "2024-06-11T18:14:40.608Z",
-      "domain": "https://test1-1588903.mybigcommerce.com",
-      "ejectedAt": null,
-      "injectedAt": null,
-      "isEnabled": false,
-      "updatedAt": "2024-06-11T18:14:40.608Z",
-      "uuid": "1af05d4c-27c5-4f60-a9c1-47cda42fcf14"
-    },
-    {
-      "_id": "66689410213783aab5d0ff14",
-      "channelId": 1588904,
-      "name": "Marmeto AU",
-      "__v": 0,
-      "createdAt": "2024-06-11T18:14:40.608Z",
-      "domain": "https://test1-1588903.mybigcommerce.com",
-      "ejectedAt": null,
-      "injectedAt": null,
-      "isEnabled": true,
-      "updatedAt": "2024-06-11T18:14:40.608Z"
-    },
-    {
-      "_id": "66689410213783aab5d0ff15",
-      "channelId": 1588905,
-      "name": "Marmeto CN",
-      "__v": 0,
-      "createdAt": "2024-06-11T18:14:40.608Z",
-      "domain": "https://test1-1588903.mybigcommerce.com",
-      "ejectedAt": null,
-      "injectedAt": null,
-      "isEnabled": true,
-      "updatedAt": "2024-06-11T18:14:40.608Z"
-    },
-    {
-      "_id": "66689410213783aab5d0ff16",
-      "channelId": 1588906,
-      "name": "Marmeto SG",
-      "__v": 0,
-      "createdAt": "2024-06-11T18:14:40.608Z",
-      "domain": "https://test1-1588903.mybigcommerce.com",
-      "ejectedAt": null,
-      "injectedAt": null,
-      "isEnabled": false,
-      "updatedAt": "2024-06-11T18:14:40.608Z"
-    }
-  ];
 
   const getChannelList = async () => {
     setLoading(true);
     setError(null);
+    console.log(Token);
+
 
     try {
-      const response = await fetch('https://randomuser.me/api/');
+      let url = 'https://payu.in.ngrok.io/api/channel/list';
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1dWlkIjoiMWFmMDVkNGMtMjdjNS00ZjYwLWE5YzEtNDdjZGE0MmZjZjE0IiwiaWF0IjoxNzE4NzczODkwLCJleHAiOjE3MTg4NjAyOTB9.AinncUlUKI4aMhirBjRd5f650PRziHZvVDyTcztFhms'
+        }
+      });
+
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
       const result = await response.json();
-      setChannel(data); // Store data in state
-      console.log(Channel, "Channels", Channel.length);
+      setChannel(result.data); // Store data in state
+      console.log(result, "result");
     } catch (error) {
       setError(error.message);
+      setLoading(true);
     } finally {
       setLoading(false);
     }
@@ -116,37 +133,54 @@ export default function Index() {
 
   useEffect(() => {
     getChannelList();
-  }, [])
+  }, []);
 
-  if (error) return <ErrorMessage error={error} />;
+
+  // const [Token, setToken] = useState(null);
+  // const searchParams = useQuery();
+
+  // useEffect(() => {
+  //   const token = searchParams;
+  //   if (toke) {
+  //     setToken(searchParams[1]);
+  //     getChannelList();
+  //     return;
+  //   }
+  // }, [searchParams]);
+
+
+  if (loading) return <Loading />;
+  if (error) return (
+    <Panel margin="xxLarge">
+      <ErrorMessage error={error} />
+      <Button actionType="normal" isLoading={loading} variant="primary" onClick={() => getChannelList()}>Reload</Button>
+    </Panel>
+  );
 
   return (
     <Panel margin="xxxLarge">
       <Box>
-        {/* <Button actionType="normal" isLoading={loading} variant="primary" onClick={getChannelList}>
-          Authenticate
-        </Button> */}
         {Channel.length > 0 && (
-            <>
-              {Channel.map((item) => (
-                <Box
-                  backgroundColor="secondary20"
-                  border="box"
-                  borderRadius="normal"
-                  padding="small"
-                  marginBottom="medium"
-                  key={item._id}
-                >
-                  <Flex justifyContent="space-between" alignItems="center">
-                  <FlexItem><Text>{item.name}</Text></FlexItem>
+          <>
+            {Channel.map((item) => (
+              <Box
+                backgroundColor="secondary20"
+                border="box"
+                borderRadius="normal"
+                padding="small"
+                marginBottom="medium"
+                key={item._id}
+              >
+                <Flex justifyContent="space-between" alignItems="center">
+                  <FlexItem><Text bold>{item.channelName}</Text></FlexItem>
                   <FlexItem>
                     {item.isEnabled ? (
-                      item.uuid ? (
+                      item.injectedAt != null ? (
                         <Button
                           marginLeft="medium"
                           actionType="destructive"
                           isLoading={loadingStates[item._id] || false}
-                          onClick={(e) => handleButtonClick(item, setLoadingStates, loadingStates, e)}
+                          onClick={() => handleButtonClick(item, setLoadingStates, loadingStates, setChannel, false)}
                         >
                           Eject
                         </Button>
@@ -155,44 +189,24 @@ export default function Index() {
                           marginLeft="medium"
                           actionType="normal"
                           isLoading={loadingStates[item._id] || false}
-                          onClick={(e) => handleButtonClick(item, setLoadingStates, loadingStates, e)}
+                          onClick={() => handleButtonClick(item, setLoadingStates, loadingStates, setChannel, true)}
                         >
                           Inject
                         </Button>
                       )
                     ) : (
-                      <Tooltip placement="right" trigger={<Button marginLeft="medium" variant="secondary">Disabled</Button>}>
+                      <Tooltip placement="right" trigger={<button className='disabled'>Disabled</button>}>
                         This channel is not active
                       </Tooltip>
                     )}
                   </FlexItem>
                 </Flex>
-                </Box>
-              ))}
-              </>
+              </Box>
+            ))}
+          </>
         )}
       </Box>
     </Panel>
   );
 }
 
-
-
-// async function makePostRequest(url, data) {
-//   try {
-//     const response = await fetch(url, {
-//       method: 'POST',
-//       headers: {
-//         'Content-Type': 'application/json'
-//       },
-//       body: JSON.stringify(data)
-//     });
-//     if (!response.ok) {
-//       throw new Error('Network response was not ok' + response.statusText);
-//     }
-//     const responseData = await response.json();
-//     console.log(responseData);
-//   } catch (error) {
-//     console.error('There has been a problem with your fetch operation:', error);
-//   }
-// }

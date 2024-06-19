@@ -11,9 +11,7 @@ const ErrorContent = ({ message }: Pick<ErrorProps, 'message'>) => (
 const ErrorMessage = ({ error, renderPanel = true }: ErrorMessageProps) => {
     if (renderPanel) {
         return (
-            <Panel margin="xxLarge">
-                <ErrorContent message={error.message} />
-            </Panel>
+            <ErrorContent message={error.message} />
         )
     }
 
